@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Bash wrapper around Python command-line tools.
+# Automatically creates virtualenv for same if missing, or module missing.
+# Use variously named symlinks to this file to select which tool to run
+
+set +o nounset  # We need to check for possibly-unbound variables
+set +o errexit  # We want to fix failed commands
+set +o xtrace
+
+
+# Look for a WORKON_HOME
+if [ -z "$WORKON_HOME" ]; then
+    echo "WORKON_HOME not found. Check your bash configuration."
+    exit 1
+fi
+
+
+VENV=$WORKON_HOME/_digital_advisor
+PIP=$VENV/bin/pip
+PYTHON=$VENV/bin/python3
+SCRIPTS=~/bin/digital_advisor
+
+# Create venv and pre-requisites
+function make_venv() {
+    if [ ! -z "$VIRTUAL_ENV" ]; then
+        echo "A venv is already active. Please deactivate."
+        exit 1
+    fi
+    python3 -m venv $VENV || { delete_venv; exit 1; }
+    $PIP install --upgrade pip setuptools wheel
+    # TODO: Remove Paramiko pinned version (and its requirement 'six')
+    $PIP install colorama fabric paramiko prettytable pytz six
+}
+
+
+# Delete venv
+function delete_venv() {
+    if [ ! -d "$PYTHON" ]; then
+        echo "Delete venv: $VENV"
+        rm -fr "$VENV"
+    fi
+}
+
+
+# Create venv if necessary
+if [ ! -f "$PYTHON" ]; then
+    echo "Command's venv not found. Creating now."
+    make_venv
+fi
+
+
+# Choose script based on symlink
+GIVEN=$(basename $0)
+if [ $GIVEN == 'da' ]; then
+    COMMAND=$SCRIPTS/da.py
+elif [ $GIVEN == 'da-servers' ]; then
+    COMMAND=$SCRIPTS/da_servers.py
+fi
+
+
+# Run script
+if [ -z "$COMMAND" ]; then
+    echo "Unknown command: $GIVEN"
+    exit 1
+else
+    $PYTHON "$COMMAND" "$@"
+
+    EXIT_CODE=$?
+
+    if [ $EXIT_CODE -eq 100 ]; then
+        # Return code 100
+        # ModuleNotFoundError: Delete virtualenv and try again.
+        echo
+        echo "This is Probably a problem with the command's venv. Let's rebuild."
+        delete_venv
+
+        echo
+        echo "Please try again now."
+    else
+        # Normal execution
+        # Pass script's exit code out to environment
+        exit $EXIT_CODE
+    fi
+fi
