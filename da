@@ -54,8 +54,6 @@ fi
 GIVEN=$(basename $0)
 if [ $GIVEN == 'da' ]; then
     COMMAND=$SCRIPTS/da.py
-elif [ $GIVEN == 'da-servers' ]; then
-    COMMAND=$SCRIPTS/da_servers.py
 fi
 
 
